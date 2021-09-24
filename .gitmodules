@@ -1,0 +1,4 @@
+[submodule "extern/lotus"]
+	path = extern/lotus
+	url = https://github.com/filecoin-project/lotus.git
+	ignore = dirty
