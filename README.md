@@ -58,6 +58,9 @@ if err != nil {
 }
 ```
 
+比较链上记录的PreCommit消息体中的SealedCid和修复程序PreCommit2计算结果storage.SectorCids，如果结果cid一致表示修复成功！
+
+
 #### Go
 
 构建filecoin-sealer-recover，你需要安装[Go 1.16.4 or higher](https://golang.org/dl/):
@@ -80,9 +83,19 @@ sudo make install
 ```
 
 ### 使用方式
+help
+```base
+sealer-recover -h
+```
+
+启动：
 ```base
 export FULLNODE_API_INFO=链节点的token
-sealer-recover --miner=f01000 --sectorNum=0 --sector-size=32GiB --sealing-result=/sector --sealing-temp=/temp
+sealer-recover --miner=f01000 \
+    --sectorNum=0 \ 
+    --sector-size=32GiB \ 
+    --sealing-result=/sector \ 
+    --sealing-temp=/temp
 ```
 #### 参数介绍
 | 参数 | 含义 | 备注 |
@@ -97,8 +110,16 @@ sealer-recover --miner=f01000 --sectorNum=0 --sector-size=32GiB --sealing-result
 使用自己修改的lotus进行打包，能优化修复速度
 
 ### TODO
-扇区恢复支持有订单的扇区，通过链的订单id，检索到订单，重新生成pieces。
+- 支持有订单的扇区，通过链的订单id，检索到订单，重新生成pieces。
+- 批量并行执行修复程序
+
+### Contributing
+欢迎PR、错误报告和问题建议！对于重大更改，请先在issues中提出问题，以便讨论兼容性和收益。
+
+### Other
+- [FILFrog](https://www.froghub.io/)
+- [Lotus CloudC2](https://github.com/froghub-io/lotus-cloudc2)
 
 ## License
 
-licensed under [Apache 2.0](https://github.com/froghub-io/filecoin-sealer-recover/blob/main/LICENSE)
+Licensed under [Apache 2.0](https://github.com/froghub-io/filecoin-sealer-recover/blob/main/LICENSE)
