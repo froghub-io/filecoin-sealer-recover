@@ -14,6 +14,7 @@ build-deps:
 	make -C ${LOTUS_PATH} deps
 
 build: build-deps
+	go mod tidy
 	go build -o $(TARGET)
 
 install:
