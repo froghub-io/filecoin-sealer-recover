@@ -11,7 +11,7 @@ Filecoin在封装或挖矿过程中，可能面临扇区数据丢失，那么就
 ### 2. NVMe缓存盘坏盘
    在这个情况下，扇区有2个状态会造成损失。
    - 扇区已经提交了PreCommit消息，但是30内未提交ProveCommit消息，会被销毁PreCommit预质押的FIL；
-   - 设置 FinalizeEarly=false，使用先提交ProveCommit再落到存储，等同丢失扇区需要终止扇区。
+   - 设置 `FinalizeEarly=false`，使用先提交ProveCommit再落到存储，等同丢失扇区需要终止扇区。
 
 ## 扇区修复的工作原理
 
@@ -65,21 +65,47 @@ if err != nil {
 
 构建filecoin-sealer-recover，你需要安装[Go 1.16.4 or higher](https://golang.org/dl/):
 
-```bash
+```shell
 wget -c https://golang.org/dl/go1.16.4.linux-amd64.tar.gz -O - | sudo tar -xz -C /usr/local
 ```
 
 ### 构建
-构建需要下载一些Go模块。这些通常托管在Github上，而Github来自中国的带宽较低。要解决此问题，请在运行之前通过设置以下变量来使用本地代理：
-```bash
+1、构建需要下载一些Go模块。这些通常托管在Github上，而Github来自中国的带宽较低。要解决此问题，请在运行之前通过设置以下变量来使用本地代理：
+```shell
 export GOPROXY=https://goproxy.cn,direct  
 ```
 
-Build and install
-```base
+2、根据您的 CPU 型号，根据您的需要选择环境变量：
+
+a.如果您有AMD Zen 或 Intel Ice Lake CPU（或更高版本），请通过添加以下两个环境变量来启用 SHA 扩展的使用：
+```shell
+export RUSTFLAGS="-C target-cpu=native -g"
+export FFI_BUILD_FROM_SOURCE=1
+```
+有关此过程的更多详细信息，请参阅本地 Filecoin FFI 部分
+
+b.一些没有 ADX 指令支持的老式 Intel 和 AMD 处理器可能会因为非法指令错误而紊乱。要解决这个问题，添加 CGO_CFLAGS 环境变量:
+```shell
+export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
+export CGO_CFLAGS="-D__BLST_PORTABLE__"
+```
+c.默认情况下，证明库中使用“multicore-sdr”选项。 除非明确禁用，否则此功能也用于 FFI。 要禁用“multicore-sdr”依赖项的构建，请将“FFI_USE_MULTICORE_SDR”设置为“0”：
+```shell
+export FFI_USE_MULTICORE_SDR=0
+```
+
+3、Build and install
+```shell
+# 扇区恢复不区分mainnet或者calibnet
 make clean all
 
 sudo make install
+```
+将 `sealer-recover` 安装到 `/usr/local/bin`
+
+4、安装完成后，使用下面的命令确保为正确的网络成功安装了.
+```shell
+sealer-recover --version
 ```
 
 ### 使用方式
@@ -90,6 +116,11 @@ sealer-recover -h
 
 启动：
 ```base
+export FIL_PROOFS_USE_MULTICORE_SDR=1
+export FIL_PROOFS_MAXIMIZE_CACHING=1
+export FIL_PROOFS_USE_GPU_COLUMN_BUILDER=1
+export FIL_PROOFS_USE_GPU_TREE_BUILDER=1
+
 export FULLNODE_API_INFO=链节点的token
 sealer-recover --miner=f01000 \
     --sectorNum=0 \ 
