@@ -124,7 +124,6 @@ export FIL_PROOFS_USE_GPU_TREE_BUILDER=1
 export FULLNODE_API_INFO=链节点的token
 sealer-recover --miner=f01000 \
     --sectorNum=0 \ 
-    --sector-size=32GiB \ 
     --sealing-result=/sector \ 
     --sealing-temp=/temp
 ```
@@ -133,7 +132,6 @@ sealer-recover --miner=f01000 \
 | :-----| :----- | :----- |
 | miner | 需要修复扇区的矿工号  | 必填 |
 | sectorNum | 需要修复的扇区号 | 必填 |
-| sector-size | 需要修复的扇区大小 | 默认值: 32GiB |
 | sealing-result | 修复后的扇区产物路径 | 默认值: ~/sector |
 | sealing-temp | 修复过程的中间产物路径，需要大空间，建议使用NVMe盘 | 默认值: ~/temp <br/> 最小空间: <br/> 32GiB # > 512GiB! <br/> 64GiB  # > 1024GiB! |
 

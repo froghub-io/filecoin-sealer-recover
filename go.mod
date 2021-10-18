@@ -7,7 +7,6 @@ replace github.com/filecoin-project/filecoin-ffi => ./extern/lotus/extern/fileco
 replace github.com/filecoin-project/lotus => ./extern/lotus
 
 require (
-	github.com/docker/go-units v0.4.0
 	github.com/filecoin-project/go-address v0.0.6
 	github.com/filecoin-project/go-state-types v0.1.1-0.20210810190654-139e0e79e69e
 	github.com/filecoin-project/lotus v1.1.2

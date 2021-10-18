@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"github.com/docker/go-units"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/lotus/chain/types"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
 	"github.com/froghub-io/filecoin-sealer-recover/recovery"
 	log "github.com/sirupsen/logrus"
@@ -33,11 +33,6 @@ func main() {
 				Required: true,
 			},
 			&cli.StringFlag{
-				Name:  "sector-size",
-				Value: "32GiB",
-				Usage: "Size of the sectors in bytes, i.e. 32GiB",
-			},
-			&cli.StringFlag{
 				Name:  "sealing-result",
 				Value: "~/sector",
 				Usage: "Recover sector result path",
@@ -59,11 +54,6 @@ func main() {
 			sectorNum := cctx.Uint64("sectorNum")
 			sealingResult := cctx.String("sealing-result")
 			sealingTemp := cctx.String("sealing-temp")
-			sectorSizeInt, err := units.RAMInBytes(cctx.String("sector-size"))
-			if err != nil {
-				return err
-			}
-			sectorSize := abi.SectorSize(sectorSizeInt)
 
 			maddr, err := address.NewFromString(miner)
 			if err != nil {
@@ -73,18 +63,25 @@ func main() {
 			if err != nil {
 				return xerrors.Errorf("Getting IDFromAddress err:", err)
 			}
-			fapi, closer, err := cliutil.GetFullNodeAPI(cctx)
+
+			fullapi, closer, err := cliutil.GetFullNodeAPI(cctx)
 			if err != nil {
 				return xerrors.Errorf("Getting FullNodeAPI err:", err)
 			}
 			defer closer()
 
-			ticketValue, sectorPreCommitOnChainInfo, err := recovery.GetOnChainSectorTicket(ctx, fapi, maddr, abi.SectorNumber(sectorNum))
+			// Sector size
+			mi, err := fullapi.StateMinerInfo(ctx, maddr, types.EmptyTSK)
+			if err != nil {
+				return xerrors.Errorf("Getting StateMinerInfo err:", err)
+			}
+
+			ticketValue, sectorPreCommitOnChainInfo, err := recovery.GetOnChainSectorTicket(ctx, fullapi, maddr, abi.SectorNumber(sectorNum))
 			if err != nil {
 				return err
 			}
 
-			if err = recovery.RecoverSealedFile(actorID, sectorNum, sectorSize, sealingResult, sealingTemp, abi.SealRandomness(ticketValue), sectorPreCommitOnChainInfo); err != nil {
+			if err = recovery.RecoverSealedFile(actorID, sectorNum, mi.SectorSize, sealingResult, sealingTemp, abi.SealRandomness(ticketValue), sectorPreCommitOnChainInfo); err != nil {
 				return err
 			}
 			log.Info("recovery sealed success!")
