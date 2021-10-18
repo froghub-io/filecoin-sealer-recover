@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/chain/types"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
 	"github.com/froghub-io/filecoin-sealer-recover/recovery"
 	log "github.com/sirupsen/logrus"
@@ -27,10 +25,15 @@ func main() {
 				Usage:    "Filecoin miner. Such as: f01000",
 				Required: true,
 			},
-			&cli.StringFlag{
-				Name:     "sectorNum",
+			&cli.IntSliceFlag{
+				Name:     "sectors",
 				Usage:    "Sector number to be recovered. Such as: 0",
 				Required: true,
+			},
+			&cli.UintFlag{
+				Name:  "parallel",
+				Usage: "Number of parallel P1",
+				Value: 1,
 			},
 			&cli.StringFlag{
 				Name:  "sealing-result",
@@ -50,12 +53,7 @@ func main() {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			miner := cctx.String("miner")
-			sectorNum := cctx.Uint64("sectorNum")
-			sealingResult := cctx.String("sealing-result")
-			sealingTemp := cctx.String("sealing-temp")
-
-			maddr, err := address.NewFromString(miner)
+			maddr, err := address.NewFromString(cctx.String("miner"))
 			if err != nil {
 				return xerrors.Errorf("Getting NewFromString err:", err)
 			}
@@ -70,21 +68,10 @@ func main() {
 			}
 			defer closer()
 
-			// Sector size
-			mi, err := fullapi.StateMinerInfo(ctx, maddr, types.EmptyTSK)
-			if err != nil {
-				return xerrors.Errorf("Getting StateMinerInfo err:", err)
-			}
-
-			ticketValue, sectorPreCommitOnChainInfo, err := recovery.GetOnChainSectorTicket(ctx, fullapi, maddr, abi.SectorNumber(sectorNum))
-			if err != nil {
+			if err = recovery.RecoverSealedFile(ctx, fullapi, maddr, actorID, cctx.IntSlice("sectors"), cctx.Uint("parallel"), cctx.String("sealing-result"), cctx.String("sealing-temp")); err != nil {
 				return err
 			}
-
-			if err = recovery.RecoverSealedFile(actorID, sectorNum, mi.SectorSize, sealingResult, sealingTemp, abi.SealRandomness(ticketValue), sectorPreCommitOnChainInfo); err != nil {
-				return err
-			}
-			log.Info("recovery sealed success!")
+			log.Info("Complete recovery sealed!")
 			return nil
 		},
 	}

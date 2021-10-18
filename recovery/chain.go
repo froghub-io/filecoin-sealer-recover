@@ -12,7 +12,7 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func GetOnChainSectorTicket(ctx context.Context, fullNodeApi v0api.FullNode, maddr address.Address, sid abi.SectorNumber) (abi.Randomness, *miner.SectorPreCommitOnChainInfo, error) {
+func getOnChainSectorTicket(ctx context.Context, fullNodeApi v0api.FullNode, maddr address.Address, sid abi.SectorNumber) (abi.Randomness, *miner.SectorPreCommitOnChainInfo, error) {
 	si, err := fullNodeApi.StateSectorGetInfo(ctx, maddr, sid, types.EmptyTSK)
 	if err != nil {
 		return nil, nil, err

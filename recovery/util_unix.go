@@ -55,16 +55,11 @@ func move(from, to string) error {
 	return nil
 }
 
-func mkdirAll(path string) error {
+func mkdirAll(path string) {
 	_, err := os.Stat(path)
 	notexist := os.IsNotExist(err)
 
 	if notexist {
-		err = os.MkdirAll(path, 0755) //nolint: gosec
-		if err != nil && !os.IsExist(err) {
-			return err
-		}
+		_ = os.MkdirAll(path, 0755) //nolint: gosec
 	}
-
-	return nil
 }
