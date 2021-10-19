@@ -42,7 +42,7 @@ func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr ad
 
 			//Control PC1 running interval
 			for {
-				if time.Now().Add(-time.Second * 10).After(p1LastTaskTime) {
+				if time.Now().Add(-time.Minute * 10).After(p1LastTaskTime) {
 					break
 				}
 				<-time.After(p1LastTaskTime.Sub(time.Now()))
