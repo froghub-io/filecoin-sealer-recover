@@ -144,7 +144,6 @@ sealer-recover --miner=f01000 \
 
 ### TODO
 - 支持有订单的扇区，通过链的订单id，检索到订单，重新生成pieces。
-- 批量并行执行修复程序
 
 ### Contributing
 欢迎PR、错误报告和问题建议！对于重大更改，请先在issues中提出问题，以便讨论兼容性和收益。
