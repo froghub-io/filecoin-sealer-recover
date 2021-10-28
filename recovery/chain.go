@@ -12,14 +12,42 @@ import (
 	"golang.org/x/xerrors"
 )
 
-func getOnChainSectorTicket(ctx context.Context, fullNodeApi v0api.FullNode, maddr address.Address, sid abi.SectorNumber) (abi.Randomness, *miner.SectorPreCommitOnChainInfo, error) {
+func GetSectorTicketOnChain(ctx context.Context, fullNodeApi v0api.FullNode, maddr address.Address, ts *types.TipSet, preCommitInfo *miner.SectorPreCommitOnChainInfo) (abi.Randomness, error) {
+	buf := new(bytes.Buffer)
+	if err := maddr.MarshalCBOR(buf); err != nil {
+		return nil, xerrors.Errorf("Address MarshalCBOR err:", err)
+	}
+
+	ticket, err := fullNodeApi.ChainGetRandomnessFromTickets(ctx, ts.Key(), crypto.DomainSeparationTag_SealRandomness, preCommitInfo.Info.SealRandEpoch, buf.Bytes())
+	if err != nil {
+		return nil, xerrors.Errorf("Getting Randomness err:", err)
+	}
+
+	return ticket, err
+}
+
+func GetSectorCommitInfoOnChain(ctx context.Context, fullNodeApi v0api.FullNode, maddr address.Address, sid abi.SectorNumber) (*types.TipSet, *miner.SectorPreCommitOnChainInfo, error) {
 	si, err := fullNodeApi.StateSectorGetInfo(ctx, maddr, sid, types.EmptyTSK)
 	if err != nil {
 		return nil, nil, err
 	}
 	if si == nil {
-		return nil, nil, xerrors.Errorf("Miner(%v) Sector(%d) info Not Found", maddr, sid)
+		//Provecommit not submitted
+		preCommitInfo, err := fullNodeApi.StateSectorPreCommitInfo(ctx, maddr, sid, types.EmptyTSK)
+		if err != nil {
+			return nil, nil, xerrors.Errorf("Getting sector PreCommit info err:", err)
+		}
+
+		ts, err := fullNodeApi.ChainGetTipSetByHeight(ctx, preCommitInfo.PreCommitEpoch, types.EmptyTSK)
+		if err != nil {
+			return nil, nil, err
+		}
+		if ts == nil {
+			return nil, nil, xerrors.Errorf("Height(%d) Tipset Not Found")
+		}
+		return ts, &preCommitInfo, err
 	}
+
 	ts, err := fullNodeApi.ChainGetTipSetByHeight(ctx, si.Activation, types.EmptyTSK)
 	if err != nil {
 		return nil, nil, err
@@ -33,17 +61,5 @@ func getOnChainSectorTicket(ctx context.Context, fullNodeApi v0api.FullNode, mad
 		return nil, nil, xerrors.Errorf("Getting sector PreCommit info err:", err)
 	}
 
-	ticketEpoch := preCommitInfo.Info.SealRandEpoch
-
-	buf := new(bytes.Buffer)
-	if err := maddr.MarshalCBOR(buf); err != nil {
-		return nil, nil, xerrors.Errorf("Address MarshalCBOR err:", err)
-	}
-
-	ticket, err := fullNodeApi.ChainGetRandomnessFromTickets(ctx, ts.Key(), crypto.DomainSeparationTag_SealRandomness, ticketEpoch, buf.Bytes())
-	if err != nil {
-		return nil, nil, xerrors.Errorf("Getting Randomness err:", err)
-	}
-
-	return ticket, &preCommitInfo, err
+	return ts, &preCommitInfo, err
 }

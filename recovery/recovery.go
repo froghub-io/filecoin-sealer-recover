@@ -49,7 +49,12 @@ func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr ad
 			}
 			p1LastTaskTime = time.Now()
 
-			ticket, sectorPreCommitOnChainInfo, err := getOnChainSectorTicket(ctx, fullNodeApi, maddr, abi.SectorNumber(sector))
+			ts, sectorPreCommitOnChainInfo, err := GetSectorCommitInfoOnChain(ctx, fullNodeApi, maddr, abi.SectorNumber(sector))
+			if err != nil {
+				log.Errorf("Getting sector (%d) precommit info error: %v ", sector, err)
+			}
+
+			ticket, err := GetSectorTicketOnChain(ctx, fullNodeApi, maddr, ts, sectorPreCommitOnChainInfo)
 			if err != nil {
 				log.Errorf("Getting sector (%d) ticket error: %v ", sector, err)
 			}
