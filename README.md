@@ -52,7 +52,7 @@ ProofType在不通网络版本和扇区大小下是不相同的，[详细代码]
 
 通过扇区区ticket的高度SealRandEpoch，向链服务器再次提取出随机数。
 ```go
-ticket, err := fullNodeApi.ChainGetRandomnessFromTickets(ctx, ts.Key(), crypto.DomainSeparationTag_SealRandomness, ticketEpoch, buf.Bytes())
+ticket, err := fullNodeApi.StateGetRandomnessFromTickets(ctx, crypto.DomainSeparationTag_SealRandomness, ticketEpoch, buf.Bytes(), ts.Key())
 if err != nil {
     return nil, nil, err
 }

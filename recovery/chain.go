@@ -18,7 +18,7 @@ func GetSectorTicketOnChain(ctx context.Context, fullNodeApi v0api.FullNode, mad
 		return nil, xerrors.Errorf("Address MarshalCBOR err:", err)
 	}
 
-	ticket, err := fullNodeApi.ChainGetRandomnessFromTickets(ctx, ts.Key(), crypto.DomainSeparationTag_SealRandomness, preCommitInfo.Info.SealRandEpoch, buf.Bytes())
+	ticket, err := fullNodeApi.StateGetRandomnessFromTickets(ctx, crypto.DomainSeparationTag_SealRandomness, preCommitInfo.Info.SealRandEpoch, buf.Bytes(), ts.Key())
 	if err != nil {
 		return nil, xerrors.Errorf("Getting Randomness err:", err)
 	}
