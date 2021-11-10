@@ -1,6 +1,7 @@
+For english version click [here](./README_EN.md)
 # 扇区修复
 
-Filecoin在封装或挖矿过程中，可能面临扇区数据丢失，那么就要被销毁PreCommit预质押的FIL，或者终止扇区最大损失扇区的90天的收益。扇区修复能修复丢失的文件，来减少或者避免损失。
+Filecoin在封装或挖矿过程中，可能面临扇区数据丢失，那么就要销毁PreCommit预质押的FIL，或者终止扇区最大损失扇区的90天的收益。扇区修复能修复丢失的文件，来减少或者避免损失。
 
 ## 扇区丢失的原因
 
@@ -10,7 +11,7 @@ Filecoin在封装或挖矿过程中，可能面临扇区数据丢失，那么就
 
 ### 2. NVMe缓存盘坏盘
    在这个情况下，扇区有2个状态会造成损失。
-   - 扇区已经提交了PreCommit消息，但是30内未提交ProveCommit消息，会被销毁PreCommit预质押的FIL；
+   - 扇区已经提交了PreCommit消息，但是30内未提交ProveCommit消息，会销毁PreCommit预质押的FIL；
    - 设置 `FinalizeEarly=false`，使用先提交ProveCommit再落到存储，等同丢失扇区需要终止扇区。
 
 ## 扇区修复的工作原理
@@ -31,7 +32,7 @@ p1o, err := ffi.SealPreCommitPhase1(
 
 p2...
 ```
-重新封装CC扇区（无订单），pieces使用官方默认的生成方式即可，额外的需要获取ticket和ProofType。
+重新封装CC扇区（无订单），pieces使用官方默认的生成方式即可，只需要额外获取ticket和ProofType。
 
 这是链上记录的PreCommit消息体：
 ```json
@@ -48,9 +49,10 @@ p2...
   "ReplaceSector": 0
 }
 ```
-ProofType在不通网络版本和扇区大小下是不相同的，[详细代码]( https://github.com/filecoin-project/lotus/blob/7a38cd9286fbe8c4faf7b1f4737b6ff4dd94d011/chain/actors/builtin/miner/miner.go#L263 )。直接使用消息体中的RegisteredProof更加方便。
+ProofType在不同网络版本和扇区大小下是不相同的，[详细代码]( https://github.com/filecoin-project/lotus/blob/7a38cd9286fbe8c4faf7b1f4737b6ff4dd94d011/chain/actors/builtin/miner/miner.go#L263 )。直接使用消息体中的RegisteredProof更加方便。
 
-通过扇区区ticket的高度SealRandEpoch，向链服务器再次提取出随机数。
+使用precommit消息体中的SealRandEpoch做为扇区的ticketEpoch，向链服务器再次提取出随机数。
+
 ```go
 ticket, err := fullNodeApi.StateGetRandomnessFromTickets(ctx, crypto.DomainSeparationTag_SealRandomness, ticketEpoch, buf.Bytes(), ts.Key())
 if err != nil {
@@ -61,7 +63,7 @@ if err != nil {
 比较链上记录的PreCommit消息体中的SealedCid和修复程序PreCommit2计算结果storage.SectorCids，如果结果cid一致表示修复成功！
 
 
-#### Go
+### Go
 
 构建filecoin-sealer-recover，你需要安装[Go 1.16.4 or higher](https://golang.org/dl/):
 
@@ -82,40 +84,48 @@ a.如果您有AMD Zen 或 Intel Ice Lake CPU（或更高版本），请通过添
 export RUSTFLAGS="-C target-cpu=native -g"
 export FFI_BUILD_FROM_SOURCE=1
 ```
-有关此过程的更多详细信息，请参阅本地 Filecoin FFI 部分
+有关此过程的更多详细信息，请参阅Filecoin FFI(https://docs.filecoin.io/get-started/lotus/installation/#native-filecoin-ffi) 部分
 
 b.一些没有 ADX 指令支持的老式 Intel 和 AMD 处理器可能会因为非法指令错误而紊乱。要解决这个问题，添加 CGO_CFLAGS 环境变量:
+
 ```shell
 export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
 export CGO_CFLAGS="-D__BLST_PORTABLE__"
 ```
+
 c.默认情况下，证明库中使用“multicore-sdr”选项。 除非明确禁用，否则此功能也用于 FFI。 要禁用“multicore-sdr”依赖项的构建，请将“FFI_USE_MULTICORE_SDR”设置为“0”：
+
 ```shell
 export FFI_USE_MULTICORE_SDR=0
 ```
 
 3、Build and install
+
 ```shell
 # 扇区恢复不区分mainnet或者calibnet
 make clean all
 
 sudo make install
 ```
+
 将 `sealer-recover` 安装到 `/usr/local/bin`
 
-4、安装完成后，使用下面的命令确保为正确的网络成功安装了.
+4、安装完成后，使用下面的命令确保为正确的网络成功安装了扇区恢复工具.
+
 ```shell
 sealer-recover --version
 ```
 
 ### 使用方式
 help
-```base
+
+```shell
 sealer-recover -h
 ```
 
 启动：
-```base
+
+```shell
 export FIL_PROOFS_USE_MULTICORE_SDR=1
 export FIL_PROOFS_MAXIMIZE_CACHING=1
 export FIL_PROOFS_USE_GPU_COLUMN_BUILDER=1
@@ -130,7 +140,8 @@ sealer-recover --miner=f01000 \
     --sealing-result=/sector \ 
     --sealing-temp=/temp
 ```
-#### 参数介绍
+
+### 参数介绍
 | 参数 | 含义 | 备注 |
 | :-----| :----- | :----- |
 | miner | 需要修复扇区的矿工号  | 必填 |
