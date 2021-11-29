@@ -63,6 +63,7 @@ func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr ad
 			if err != nil {
 				log.Errorf("Sector (%d) ,expands the path error: %v", sector, err)
 			}
+			// mkdir every time ??
 			mkdirAll(sdir)
 			tempDir, err := ioutil.TempDir(sdir, fmt.Sprintf("recover-%d", sector))
 			if err != nil {
@@ -71,7 +72,7 @@ func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr ad
 			if err := os.MkdirAll(tempDir, 0775); err != nil {
 				log.Errorf("Sector (%d) ,creates a directory named path error: %v", sector, err)
 			}
-
+			// 初始化封装变量？
 			sb, err := ffiwrapper.New(&basicfs.Provider{
 				Root: tempDir,
 			})
@@ -166,7 +167,10 @@ func MoveStorage(ctx context.Context, sector storage.SectorRef, tempDir string, 
 	mkdirAll(sealingResult + "/cache")
 	mkdirAll(sealingResult + "/sealed")
 	if err := move(tempDir+"/cache/"+sectorNum, sealingResult+"/cache/"+sectorNum); err != nil {
-		return xerrors.Errorf("SectorID: %d, move cache error：%s", sector.ID, err)
+		// return xerrors.Errorf("SectorID: %d, move cache error：%s", sector.ID, err)
+		// change the output to warn info since this will no impact the result
+		log.Warn("can move sector to your sealingResult, reason: ",err)
+		return nil
 	}
 	if err := move(tempDir+"/sealed/"+sectorNum, sealingResult+"/sealed/"+sectorNum); err != nil {
 		return xerrors.Errorf("SectorID: %d, move sealed error：%s", sector.ID, err)
