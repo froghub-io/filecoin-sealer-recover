@@ -1,4 +1,4 @@
-package recovery
+package chain
 
 import (
 	"bytes"
@@ -31,6 +31,7 @@ func GetSectorCommitInfoOnChain(ctx context.Context, fullNodeApi v0api.FullNode,
 	if err != nil {
 		return nil, nil, err
 	}
+
 	if si == nil {
 		//Provecommit not submitted
 		preCommitInfo, err := fullNodeApi.StateSectorPreCommitInfo(ctx, maddr, sid, types.EmptyTSK)

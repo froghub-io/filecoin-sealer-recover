@@ -2,17 +2,19 @@ package recovery
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/api/v0api"
-	"github.com/filecoin-project/lotus/chain/types"
+	cliutil "github.com/filecoin-project/lotus/cli/util"
 	"github.com/filecoin-project/lotus/extern/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/lotus/extern/sector-storage/ffiwrapper/basicfs"
 	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
 	"github.com/filecoin-project/specs-storage/storage"
+	"github.com/froghub-io/filecoin-sealer-recover/export"
 	"github.com/mitchellh/go-homedir"
 	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 	"io/ioutil"
 	"os"
@@ -21,20 +23,94 @@ import (
 	"time"
 )
 
-func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr address.Address, actorID uint64, sectors []int, parallel uint, sealingResult string, sealingTemp string) error {
-	// Sector size
-	mi, err := fullNodeApi.StateMinerInfo(ctx, maddr, types.EmptyTSK)
+var RecoverCmd = &cli.Command{
+	Name:  "recover",
+	Usage: "Recovery sector tools",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "sectors-recovery-metadata",
+			Usage: "specify the metadata file for the sectors recovery",
+		},
+		&cli.IntSliceFlag{
+			Name:     "sector",
+			Usage:    "Sector number to be recovered. Such as: 0",
+			Required: true,
+		},
+		&cli.UintFlag{
+			Name:  "parallel",
+			Usage: "Number of parallel P1",
+			Value: 1,
+		},
+		&cli.StringFlag{
+			Name:  "sealing-result",
+			Value: "~/sector",
+			Usage: "Recover sector result path",
+		},
+		&cli.StringFlag{
+			Name:  "sealing-temp",
+			Value: "~/temp",
+			Usage: "Temporarily generated during sector recovery",
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		log.Info("Start sealer recovery!")
+
+		ctx := cliutil.DaemonContext(cctx)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		pssb := cctx.String("sectors-recovery-metadata")
+		if pssb == "" {
+			return xerrors.Errorf("Undefined sectors recovery metadata")
+		}
+
+		log.Infof("Importing sectors recovery metadata for %s", pssb)
+
+		rp, err := migrateRecoverMeta(ctx, pssb)
+		if err != nil {
+			return xerrors.Errorf("migrating sectors recovery metadata: %w", err)
+		}
+
+		if err = RecoverSealedFile(ctx, rp, cctx.Uint("parallel"), cctx.String("sealing-result"), cctx.String("sealing-temp")); err != nil {
+			return err
+		}
+		log.Info("Complete recovery sealed!")
+		return nil
+	},
+}
+
+func migrateRecoverMeta(ctx context.Context, metadata string) (export.RecoveryParams, error) {
+	metadata, err := homedir.Expand(metadata)
 	if err != nil {
-		return xerrors.Errorf("Getting StateMinerInfo err:", err)
+		return export.RecoveryParams{}, xerrors.Errorf("expanding sectors recovery dir: %w", err)
+	}
+
+	b, err := ioutil.ReadFile(metadata)
+	if err != nil {
+		return export.RecoveryParams{}, xerrors.Errorf("reading sectors recovery metadata: %w", err)
+	}
+
+	rp := export.RecoveryParams{}
+	if err := json.Unmarshal(b, &rp); err != nil {
+		return export.RecoveryParams{}, xerrors.Errorf("unmarshaling sectors recovery metadata: %w", err)
+	}
+
+	return rp, nil
+}
+
+func RecoverSealedFile(ctx context.Context, rp export.RecoveryParams, parallel uint, sealingResult string, sealingTemp string) error {
+	actorID, err := address.IDFromAddress(rp.Miner)
+	if err != nil {
+		return xerrors.Errorf("Getting IDFromAddress err:", err)
 	}
 
 	wg := &sync.WaitGroup{}
 	limiter := make(chan bool, parallel)
 	var p1LastTaskTime time.Time
-	for _, sector := range sectors {
+	for _, sector := range rp.SectorInfos {
 		wg.Add(1)
 		limiter <- true
-		go func(sector int64) {
+		go func(sector *export.SectorInfo) {
 			defer func() {
 				wg.Done()
 				<-limiter
@@ -48,16 +124,6 @@ func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr ad
 				<-time.After(p1LastTaskTime.Sub(time.Now()))
 			}
 			p1LastTaskTime = time.Now()
-
-			ts, sectorPreCommitOnChainInfo, err := GetSectorCommitInfoOnChain(ctx, fullNodeApi, maddr, abi.SectorNumber(sector))
-			if err != nil {
-				log.Errorf("Getting sector (%d) precommit info error: %v ", sector, err)
-			}
-
-			ticket, err := GetSectorTicketOnChain(ctx, fullNodeApi, maddr, ts, sectorPreCommitOnChainInfo)
-			if err != nil {
-				log.Errorf("Getting sector (%d) ticket error: %v ", sector, err)
-			}
 
 			sdir, err := homedir.Expand(sealingTemp)
 			if err != nil {
@@ -81,15 +147,15 @@ func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr ad
 			sid := storage.SectorRef{
 				ID: abi.SectorID{
 					Miner:  abi.ActorID(actorID),
-					Number: abi.SectorNumber(sector),
+					Number: sector.SectorNumber,
 				},
-				ProofType: sectorPreCommitOnChainInfo.Info.SealProof,
+				ProofType: sector.SealProof,
 			}
 
-			log.Infof("Start recover sector(%d,%d), registeredSealProof: %d, ticket: %x", actorID, sector, sectorPreCommitOnChainInfo.Info.SealProof, ticket)
+			log.Infof("Start recover sector(%d,%d), registeredSealProof: %d, ticket: %x", actorID, sector, sector.SealProof, sector.Ticket)
 
 			log.Infof("Start running AP, sector (%d)", sector)
-			pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(mi.SectorSize).Unpadded(), sealing.NewNullReader(abi.UnpaddedPieceSize(mi.SectorSize)))
+			pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(rp.SectorSize).Unpadded(), sealing.NewNullReader(abi.UnpaddedPieceSize(rp.SectorSize)))
 			if err != nil {
 				log.Errorf("Sector (%d) ,running AP  error: %v", sector, err)
 			}
@@ -98,13 +164,13 @@ func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr ad
 			log.Infof("Complete AP, sector (%d)", sector)
 
 			log.Infof("Start running PreCommit1, sector (%d)", sector)
-			pc1o, err := sb.SealPreCommit1(context.TODO(), sid, abi.SealRandomness(ticket), []abi.PieceInfo{pi})
+			pc1o, err := sb.SealPreCommit1(context.TODO(), sid, abi.SealRandomness(sector.Ticket), []abi.PieceInfo{pi})
 			if err != nil {
 				log.Errorf("Sector (%d) , running PreCommit1  error: %v", sector, err)
 			}
 			log.Infof("Complete PreCommit1, sector (%d)", sector)
 
-			err = sealPreCommit2AndCheck(ctx, sb, sid, pc1o, sectorPreCommitOnChainInfo.Info.SealedCID.String())
+			err = sealPreCommit2AndCheck(ctx, sb, sid, pc1o, sector.SealedCID.String())
 			if err != nil {
 				log.Errorf("Sector (%d) , running PreCommit2  error: %v", sector, err)
 			}
@@ -115,7 +181,7 @@ func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr ad
 			}
 
 			log.Infof("Complete sector (%d)", sector)
-		}(int64(sector))
+		}(sector)
 	}
 	wg.Wait()
 
