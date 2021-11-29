@@ -14,7 +14,6 @@ import (
 
 func GetSectorTicketOnChain(ctx context.Context, fullNodeApi v0api.FullNode, maddr address.Address, ts *types.TipSet, preCommitInfo *miner.SectorPreCommitOnChainInfo) (abi.Randomness, error) {
 	buf := new(bytes.Buffer)
-	// write marshalCBOR to buf
 	if err := maddr.MarshalCBOR(buf); err != nil {
 		return nil, xerrors.Errorf("Address MarshalCBOR err:", err)
 	}

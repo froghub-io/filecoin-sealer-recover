@@ -63,7 +63,6 @@ func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr ad
 			if err != nil {
 				log.Errorf("Sector (%d) ,expands the path error: %v", sector, err)
 			}
-			// mkdir every time ??
 			mkdirAll(sdir)
 			tempDir, err := ioutil.TempDir(sdir, fmt.Sprintf("recover-%d", sector))
 			if err != nil {
@@ -72,7 +71,6 @@ func RecoverSealedFile(ctx context.Context, fullNodeApi v0api.FullNode, maddr ad
 			if err := os.MkdirAll(tempDir, 0775); err != nil {
 				log.Errorf("Sector (%d) ,creates a directory named path error: %v", sector, err)
 			}
-			// 初始化封装变量？
 			sb, err := ffiwrapper.New(&basicfs.Provider{
 				Root: tempDir,
 			})
