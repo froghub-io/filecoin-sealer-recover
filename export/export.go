@@ -57,10 +57,12 @@ var ExportCmd = &cli.Command{
 		}
 
 		sectorInfos := make(SectorInfos, 0)
+		failtSectors := make([]uint64, 0)
 		for _, sector := range cctx.IntSlice("sector") {
 			si, err := fullNodeApi.StateSectorGetInfo(context.Background(), maddr, abi.SectorNumber(sector), types.EmptyTSK)
 			if err != nil {
 				log.Errorf("Sector (%d), StateSectorGetInfo error: %v", sector, err)
+				failtSectors = append(failtSectors, uint64(sector))
 				continue
 			}
 
@@ -69,6 +71,7 @@ var ExportCmd = &cli.Command{
 				preCommitInfo, err := fullNodeApi.StateSectorPreCommitInfo(context.Background(), maddr, abi.SectorNumber(sector), types.EmptyTSK)
 				if err != nil {
 					log.Errorf("Sector (%d), StateSectorPreCommitInfo error: %v", sector, err)
+					failtSectors = append(failtSectors, uint64(sector))
 					continue
 				}
 				sectorInfos = append(sectorInfos, &SectorInfo{
@@ -105,6 +108,7 @@ var ExportCmd = &cli.Command{
 			ticket, err := fullNodeApi.StateGetRandomnessFromTickets(context.Background(), crypto.DomainSeparationTag_SealRandomness, sectorInfo.Activation, buf.Bytes(), tsk)
 			if err != nil {
 				log.Errorf("Sector (%d), Getting Randomness  error: %v", sectorInfo.SectorNumber, err)
+				failtSectors = append(failtSectors, uint64(sectorInfo.SectorNumber))
 				continue
 			}
 			sectorInfo.Ticket = ticket
@@ -130,7 +134,7 @@ var ExportCmd = &cli.Command{
 		}
 
 		end := time.Now()
-		fmt.Println("export", len(sectorInfos), "sectors, elapsed:", end.Sub(start))
+		fmt.Println("export", len(sectorInfos), "sectors, failt sectors:", failtSectors, ", elapsed:", end.Sub(start))
 
 		return nil
 	},
