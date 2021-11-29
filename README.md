@@ -144,9 +144,9 @@ export FIL_PROOFS_USE_GPU_TREE_BUILDER=1
 
 export FULLNODE_API_INFO=token of chain node
 sealer-recover --miner=f01000 \
-    --sectors=0 \ 
-    --sectors=1 \ 
-    --sectors=2 \     
+    --sector=0 \ 
+    --sector=1 \ 
+    --sector=2 \     
     --parallel=6 \ 
     --sealing-result=/sector \ 
     --sealing-temp=/temp
@@ -157,7 +157,7 @@ sealer-recover --miner=f01000 \
 | Parameters | Meaning | Remarks |
 | :-----| :----- | :----- |
 | miner | The miner number of the sectors to be repaired | Required |
-| sectors | Sector number to be repaired | required
+| sector | Sector number to be repaired | required
 | parallel | Number of parallel sectors to be repaired for sector p1, _refer to core count for setting_ | default: 1 |
 | sealing-result | path to the repaired sector product | default: ~/sector |
 | sealing-temp | Intermediate product path for repair process, large space required, NVMe disk recommended | Default: ~/temp <br/> Minimum space: <br/> 32GiB # > 512GiB! <br/> 64GiB # > 1024GiB!
