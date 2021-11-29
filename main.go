@@ -26,8 +26,8 @@ func main() {
 				Required: true,
 			},
 			&cli.IntSliceFlag{
-				Name:     "sectors",
-				Usage:    "Sector number to be recovered. Such as: 0",
+				Name:     "sector",
+				Usage:    "Sector number to be recovered. Such as: --sector=0 --sector=1 ... ",
 				Required: true,
 			},
 			&cli.UintFlag{
@@ -68,7 +68,7 @@ func main() {
 			}
 			defer closer()
 
-			if err = recovery.RecoverSealedFile(ctx, fullapi, maddr, actorID, cctx.IntSlice("sectors"), cctx.Uint("parallel"), cctx.String("sealing-result"), cctx.String("sealing-temp")); err != nil {
+			if err = recovery.RecoverSealedFile(ctx, fullapi, maddr, actorID, cctx.IntSlice("sector"), cctx.Uint("parallel"), cctx.String("sealing-result"), cctx.String("sealing-temp")); err != nil {
 				return err
 			}
 			log.Info("Complete recovery sealed!")
