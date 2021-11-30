@@ -22,7 +22,7 @@ import (
 
 var ExportCmd = &cli.Command{
 	Name:  "export",
-	Usage: "Recovery sector tools",
+	Usage: "Export sector metadata",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "miner",
@@ -31,7 +31,7 @@ var ExportCmd = &cli.Command{
 		},
 		&cli.IntSliceFlag{
 			Name:     "sector",
-			Usage:    "Sector number to be recovered. Such as: 0",
+			Usage:    "Specify which sector metadata to export. Such as: 0",
 			Required: true,
 		},
 	},

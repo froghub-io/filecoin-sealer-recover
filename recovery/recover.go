@@ -33,7 +33,7 @@ var RecoverCmd = &cli.Command{
 		},
 		&cli.IntSliceFlag{
 			Name:     "sector",
-			Usage:    "Sector number to be recovered. Such as: 0",
+			Usage:    "Specify which sectors in the metadata file need to be recovered. Such as: 0",
 			Required: true,
 		},
 		&cli.UintFlag{
@@ -49,7 +49,7 @@ var RecoverCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:  "sealing-temp",
 			Value: "~/temp",
-			Usage: "Temporarily generated during sector recovery",
+			Usage: "Temporarily generated during sector file",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -61,15 +61,26 @@ var RecoverCmd = &cli.Command{
 
 		pssb := cctx.String("sectors-recovery-metadata")
 		if pssb == "" {
-			return xerrors.Errorf("Undefined sectors recovery metadata")
+			return xerrors.Errorf("Undefined sectors metadata")
 		}
 
-		log.Infof("Importing sectors recovery metadata for %s", pssb)
+		log.Infof("Importing sectors metadata for %s", pssb)
 
 		rp, err := migrateRecoverMeta(ctx, pssb)
 		if err != nil {
-			return xerrors.Errorf("migrating sectors recovery metadata: %w", err)
+			return xerrors.Errorf("migrating sectors metadata: %w", err)
 		}
+
+		runSectors := cctx.IntSlice("sector")
+		sectorInfos := make(export.SectorInfos, 0)
+		for _, sectorInfo := range rp.SectorInfos {
+			for _, num := range runSectors {
+				if uint64(num) == uint64(sectorInfo.SectorNumber) {
+					sectorInfos = append(sectorInfos, sectorInfo)
+				}
+			}
+		}
+		rp.SectorInfos = sectorInfos
 
 		if err = RecoverSealedFile(ctx, rp, cctx.Uint("parallel"), cctx.String("sealing-result"), cctx.String("sealing-temp")); err != nil {
 			return err
@@ -233,7 +244,7 @@ func MoveStorage(ctx context.Context, sector storage.SectorRef, tempDir string, 
 	if err := move(tempDir+"/cache/"+sectorNum, sealingResult+"/cache/"+sectorNum); err != nil {
 		// return xerrors.Errorf("SectorID: %d, move cache error：%s", sector.ID, err)
 		// change the output to warn info since this will no impact the result
-		log.Warn("can move sector to your sealingResult, reason: ",err)
+		log.Warn("can move sector to your sealingResult, reason: ", err)
 		return nil
 	}
 	if err := move(tempDir+"/sealed/"+sectorNum, sealingResult+"/sealed/"+sectorNum); err != nil {
