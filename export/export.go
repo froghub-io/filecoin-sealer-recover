@@ -2,7 +2,6 @@ package export
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/filecoin-project/go-address"
@@ -36,7 +35,7 @@ var ExportCmd = &cli.Command{
 		},
 	},
 	Action: func(cctx *cli.Context) error {
-
+		ctx := cliutil.ReqContext(cctx)
 		start := time.Now()
 
 		maddr, err := address.NewFromString(cctx.String("miner"))
@@ -51,7 +50,7 @@ var ExportCmd = &cli.Command{
 		defer closer()
 
 		//Sector size
-		mi, err := fullNodeApi.StateMinerInfo(context.Background(), maddr, types.EmptyTSK)
+		mi, err := fullNodeApi.StateMinerInfo(ctx, maddr, types.EmptyTSK)
 		if err != nil {
 			return xerrors.Errorf("Getting StateMinerInfo err:", err)
 		}
@@ -59,7 +58,7 @@ var ExportCmd = &cli.Command{
 		sectorInfos := make(SectorInfos, 0)
 		failtSectors := make([]uint64, 0)
 		for _, sector := range cctx.IntSlice("sector") {
-			si, err := fullNodeApi.StateSectorGetInfo(context.Background(), maddr, abi.SectorNumber(sector), types.EmptyTSK)
+			si, err := fullNodeApi.StateSectorGetInfo(ctx, maddr, abi.SectorNumber(sector), types.EmptyTSK)
 			if err != nil {
 				log.Errorf("Sector (%d), StateSectorGetInfo error: %v", sector, err)
 				failtSectors = append(failtSectors, uint64(sector))
@@ -68,7 +67,7 @@ var ExportCmd = &cli.Command{
 
 			if si == nil {
 				//ProveCommit not submitted
-				preCommitInfo, err := fullNodeApi.StateSectorPreCommitInfo(context.Background(), maddr, abi.SectorNumber(sector), types.EmptyTSK)
+				preCommitInfo, err := fullNodeApi.StateSectorPreCommitInfo(ctx, maddr, abi.SectorNumber(sector), types.EmptyTSK)
 				if err != nil {
 					log.Errorf("Sector (%d), StateSectorPreCommitInfo error: %v", sector, err)
 					failtSectors = append(failtSectors, uint64(sector))
@@ -102,10 +101,10 @@ var ExportCmd = &cli.Command{
 
 		tsk := types.EmptyTSK
 		for _, sectorInfo := range sectorInfos {
-			ts, err := fullNodeApi.ChainGetTipSetByHeight(context.Background(), sectorInfo.Activation, tsk)
+			ts, err := fullNodeApi.ChainGetTipSetByHeight(ctx, sectorInfo.Activation, tsk)
 			tsk = ts.Key()
 
-			ticket, err := fullNodeApi.StateGetRandomnessFromTickets(context.Background(), crypto.DomainSeparationTag_SealRandomness, sectorInfo.Activation, buf.Bytes(), tsk)
+			ticket, err := fullNodeApi.StateGetRandomnessFromTickets(ctx, crypto.DomainSeparationTag_SealRandomness, sectorInfo.Activation, buf.Bytes(), tsk)
 			if err != nil {
 				log.Errorf("Sector (%d), Getting Randomness  error: %v", sectorInfo.SectorNumber, err)
 				failtSectors = append(failtSectors, uint64(sectorInfo.SectorNumber))
