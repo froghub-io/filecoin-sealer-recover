@@ -61,10 +61,10 @@ var RecoverCmd = &cli.Command{
 
 		pssb := cctx.String("sectors-recovery-metadata")
 		if pssb == "" {
-			return xerrors.Errorf("Undefined sectors metadata")
+			return xerrors.Errorf("Undefined sectors recovery metadata")
 		}
 
-		log.Infof("Importing sectors metadata for %s", pssb)
+		log.Infof("Importing sectors recovery metadata for %s", pssb)
 
 		rp, err := migrateRecoverMeta(ctx, pssb)
 		if err != nil {

@@ -2,6 +2,7 @@ package export
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/filecoin-project/go-address"
@@ -28,10 +29,9 @@ var ExportCmd = &cli.Command{
 			Usage:    "Filecoin Miner. Such as: f01000",
 			Required: true,
 		},
-		&cli.IntSliceFlag{
-			Name:     "sector",
-			Usage:    "Specify which sector metadata to export. Such as: 0",
-			Required: true,
+		&cli.StringFlag{
+			Name:  "sectors-metadata",
+			Usage: "specify the metadata file for the sectors",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -55,10 +55,22 @@ var ExportCmd = &cli.Command{
 			return xerrors.Errorf("Getting StateMinerInfo err:", err)
 		}
 
+		pssb := cctx.String("sectors-metadata")
+		if pssb == "" {
+			return xerrors.Errorf("Undefined sectors metadata")
+		}
+
+		log.Infof("Importing sectors recovery metadata for %s", pssb)
+
+		sectors, err := migrateSectorsMeta(ctx, pssb)
+		if err != nil {
+			return xerrors.Errorf("migrating sectors metadata: %w", err)
+		}
+
 		sectorInfos := make(SectorInfos, 0)
 		failtSectors := make([]uint64, 0)
-		for _, sector := range cctx.IntSlice("sector") {
-			si, err := fullNodeApi.StateSectorGetInfo(ctx, maddr, abi.SectorNumber(sector), types.EmptyTSK)
+		for _, sector := range sectors {
+			si, err := fullNodeApi.StateSectorGetInfo(ctx, maddr, sector, types.EmptyTSK)
 			if err != nil {
 				log.Errorf("Sector (%d), StateSectorGetInfo error: %v", sector, err)
 				failtSectors = append(failtSectors, uint64(sector))
@@ -67,14 +79,14 @@ var ExportCmd = &cli.Command{
 
 			if si == nil {
 				//ProveCommit not submitted
-				preCommitInfo, err := fullNodeApi.StateSectorPreCommitInfo(ctx, maddr, abi.SectorNumber(sector), types.EmptyTSK)
+				preCommitInfo, err := fullNodeApi.StateSectorPreCommitInfo(ctx, maddr, sector, types.EmptyTSK)
 				if err != nil {
 					log.Errorf("Sector (%d), StateSectorPreCommitInfo error: %v", sector, err)
 					failtSectors = append(failtSectors, uint64(sector))
 					continue
 				}
 				sectorInfos = append(sectorInfos, &SectorInfo{
-					SectorNumber: abi.SectorNumber(sector),
+					SectorNumber: sector,
 					SealProof:    preCommitInfo.Info.SealProof,
 					Activation:   preCommitInfo.PreCommitEpoch,
 					SealedCID:    preCommitInfo.Info.SealedCID,
@@ -83,7 +95,7 @@ var ExportCmd = &cli.Command{
 			}
 
 			sectorInfos = append(sectorInfos, &SectorInfo{
-				SectorNumber: abi.SectorNumber(sector),
+				SectorNumber: sector,
 				SealProof:    si.SealProof,
 				Activation:   si.Activation,
 				SealedCID:    si.SealedCID,
@@ -99,6 +111,13 @@ var ExportCmd = &cli.Command{
 			return xerrors.Errorf("Address MarshalCBOR err:", err)
 		}
 
+		output := &RecoveryParams{
+			Miner:       maddr,
+			SectorSize:  mi.SectorSize,
+			SectorInfos: sectorInfos,
+		}
+		outputSectorInfos := make(SectorInfos, 0)
+
 		tsk := types.EmptyTSK
 		for _, sectorInfo := range sectorInfos {
 			ts, err := fullNodeApi.ChainGetTipSetByHeight(ctx, sectorInfo.Activation, tsk)
@@ -111,25 +130,23 @@ var ExportCmd = &cli.Command{
 				continue
 			}
 			sectorInfo.Ticket = ticket
-		}
 
-		output := &RecoveryParams{
-			Miner:       maddr,
-			SectorSize:  mi.SectorSize,
-			SectorInfos: sectorInfos,
-		}
-		out, err := json.MarshalIndent(output, "", "\t")
-		if err != nil {
-			return err
-		}
+			outputSectorInfos = append(outputSectorInfos, sectorInfo)
+			output.SectorInfos = outputSectorInfos
 
-		of, err := homedir.Expand("sectors-recovery-" + maddr.String() + ".json")
-		if err != nil {
-			return err
-		}
+			out, err := json.MarshalIndent(output, "", "\t")
+			if err != nil {
+				return err
+			}
 
-		if err := ioutil.WriteFile(of, out, 0644); err != nil {
-			return err
+			of, err := homedir.Expand("sectors-recovery-" + maddr.String() + ".json")
+			if err != nil {
+				return err
+			}
+
+			if err := ioutil.WriteFile(of, out, 0644); err != nil {
+				return err
+			}
 		}
 
 		end := time.Now()
@@ -165,4 +182,25 @@ func (t SectorInfos) Less(i, j int) bool {
 	}
 
 	return t[i].SectorNumber < t[j].SectorNumber
+}
+
+type SectorNumbers []abi.SectorNumber
+
+func migrateSectorsMeta(ctx context.Context, metadata string) ([]abi.SectorNumber, error) {
+	metadata, err := homedir.Expand(metadata)
+	if err != nil {
+		return []abi.SectorNumber{}, xerrors.Errorf("expanding sectors recovery dir: %w", err)
+	}
+
+	b, err := ioutil.ReadFile(metadata)
+	if err != nil {
+		return []abi.SectorNumber{}, xerrors.Errorf("reading sectors recovery metadata: %w", err)
+	}
+
+	var sectors []abi.SectorNumber
+	if err := json.Unmarshal(b, &sectors); err != nil {
+		return []abi.SectorNumber{}, xerrors.Errorf("unmarshaling sectors recovery metadata: %w", err)
+	}
+
+	return sectors, nil
 }
