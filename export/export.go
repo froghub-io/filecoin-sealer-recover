@@ -1,13 +1,11 @@
 package export
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/go-state-types/crypto"
 	"github.com/filecoin-project/lotus/chain/types"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
 	"github.com/ipfs/go-cid"
@@ -16,7 +14,6 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 	"io/ioutil"
-	"sort"
 	"time"
 )
 
@@ -67,72 +64,33 @@ var ExportCmd = &cli.Command{
 			return xerrors.Errorf("migrating sectors metadata: %w", err)
 		}
 
+		output := &RecoveryParams{
+			Miner:      maddr,
+			SectorSize: mi.SectorSize,
+		}
 		sectorInfos := make(SectorInfos, 0)
 		failtSectors := make([]uint64, 0)
 		for _, sector := range sectors {
-			si, err := fullNodeApi.StateSectorGetInfo(ctx, maddr, sector, types.EmptyTSK)
+			ts, sectorPreCommitOnChainInfo, err := GetSectorCommitInfoOnChain(ctx, fullNodeApi, maddr, abi.SectorNumber(sector))
 			if err != nil {
-				log.Errorf("Sector (%d), StateSectorGetInfo error: %v", sector, err)
-				failtSectors = append(failtSectors, uint64(sector))
+				log.Errorf("Getting sector (%d) precommit info error: %v ", sector, err)
 				continue
 			}
-
-			if si == nil {
-				//ProveCommit not submitted
-				preCommitInfo, err := fullNodeApi.StateSectorPreCommitInfo(ctx, maddr, sector, types.EmptyTSK)
-				if err != nil {
-					log.Errorf("Sector (%d), StateSectorPreCommitInfo error: %v", sector, err)
-					failtSectors = append(failtSectors, uint64(sector))
-					continue
-				}
-				sectorInfos = append(sectorInfos, &SectorInfo{
-					SectorNumber: sector,
-					SealProof:    preCommitInfo.Info.SealProof,
-					Activation:   preCommitInfo.PreCommitEpoch,
-					SealedCID:    preCommitInfo.Info.SealedCID,
-				})
-				continue
-			}
-
-			sectorInfos = append(sectorInfos, &SectorInfo{
+			si := &SectorInfo{
 				SectorNumber: sector,
-				SealProof:    si.SealProof,
-				Activation:   si.Activation,
-				SealedCID:    si.SealedCID,
-			})
-		}
+				SealProof:    sectorPreCommitOnChainInfo.Info.SealProof,
+				SealedCID:    sectorPreCommitOnChainInfo.Info.SealedCID,
+			}
 
-		//sort by sectorInfo.Activation
-		//walk back from the execTs instead of HEAD, to save time.
-		sort.Sort(sectorInfos)
-
-		buf := new(bytes.Buffer)
-		if err := maddr.MarshalCBOR(buf); err != nil {
-			return xerrors.Errorf("Address MarshalCBOR err:", err)
-		}
-
-		output := &RecoveryParams{
-			Miner:       maddr,
-			SectorSize:  mi.SectorSize,
-			SectorInfos: sectorInfos,
-		}
-		outputSectorInfos := make(SectorInfos, 0)
-
-		tsk := types.EmptyTSK
-		for _, sectorInfo := range sectorInfos {
-			ts, err := fullNodeApi.ChainGetTipSetByHeight(ctx, sectorInfo.Activation, tsk)
-			tsk = ts.Key()
-
-			ticket, err := fullNodeApi.StateGetRandomnessFromTickets(ctx, crypto.DomainSeparationTag_SealRandomness, sectorInfo.Activation, buf.Bytes(), tsk)
+			ticket, err := GetSectorTicketOnChain(ctx, fullNodeApi, maddr, ts, sectorPreCommitOnChainInfo)
 			if err != nil {
-				log.Errorf("Sector (%d), Getting Randomness  error: %v", sectorInfo.SectorNumber, err)
-				failtSectors = append(failtSectors, uint64(sectorInfo.SectorNumber))
+				log.Errorf("Getting sector (%d) ticket error: %v ", sector, err)
 				continue
 			}
-			sectorInfo.Ticket = ticket
+			si.Ticket = ticket
 
-			outputSectorInfos = append(outputSectorInfos, sectorInfo)
-			output.SectorInfos = outputSectorInfos
+			sectorInfos = append(sectorInfos, si)
+			output.SectorInfos = sectorInfos
 
 			out, err := json.MarshalIndent(output, "", "\t")
 			if err != nil {
@@ -164,7 +122,6 @@ type RecoveryParams struct {
 
 type SectorInfo struct {
 	SectorNumber abi.SectorNumber
-	Activation   abi.ChainEpoch
 	Ticket       abi.Randomness
 	SealProof    abi.RegisteredSealProof
 	SealedCID    cid.Cid
@@ -177,10 +134,6 @@ func (t SectorInfos) Len() int { return len(t) }
 func (t SectorInfos) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
 
 func (t SectorInfos) Less(i, j int) bool {
-	if t[i].Activation != t[j].Activation {
-		return t[i].Activation > t[j].Activation
-	}
-
 	return t[i].SectorNumber < t[j].SectorNumber
 }
 

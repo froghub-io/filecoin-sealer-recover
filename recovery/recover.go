@@ -163,35 +163,35 @@ func RecoverSealedFile(ctx context.Context, rp export.RecoveryParams, parallel u
 				ProofType: sector.SealProof,
 			}
 
-			log.Infof("Start recover sector(%d,%d), registeredSealProof: %d, ticket: %x", actorID, sector, sector.SealProof, sector.Ticket)
+			log.Infof("Start recover sector(%d,%d), registeredSealProof: %d, ticket: %x", actorID, sector.SectorNumber, sector.SealProof, sector.Ticket)
 
-			log.Infof("Start running AP, sector (%d)", sector)
+			log.Infof("Start running AP, sector (%d)", sector.SectorNumber)
 			pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(rp.SectorSize).Unpadded(), sealing.NewNullReader(abi.UnpaddedPieceSize(rp.SectorSize)))
 			if err != nil {
-				log.Errorf("Sector (%d) ,running AP  error: %v", sector, err)
+				log.Errorf("Sector (%d) ,running AP  error: %v", sector.SectorNumber, err)
 			}
 			var pieces []abi.PieceInfo
 			pieces = append(pieces, pi)
-			log.Infof("Complete AP, sector (%d)", sector)
+			log.Infof("Complete AP, sector (%d)", sector.SectorNumber)
 
-			log.Infof("Start running PreCommit1, sector (%d)", sector)
+			log.Infof("Start running PreCommit1, sector (%d)", sector.SectorNumber)
 			pc1o, err := sb.SealPreCommit1(context.TODO(), sid, abi.SealRandomness(sector.Ticket), []abi.PieceInfo{pi})
 			if err != nil {
-				log.Errorf("Sector (%d) , running PreCommit1  error: %v", sector, err)
+				log.Errorf("Sector (%d) , running PreCommit1  error: %v", sector.SectorNumber, err)
 			}
-			log.Infof("Complete PreCommit1, sector (%d)", sector)
+			log.Infof("Complete PreCommit1, sector (%d)", sector.SectorNumber)
 
 			err = sealPreCommit2AndCheck(ctx, sb, sid, pc1o, sector.SealedCID.String())
 			if err != nil {
-				log.Errorf("Sector (%d) , running PreCommit2  error: %v", sector, err)
+				log.Errorf("Sector (%d) , running PreCommit2  error: %v", sector.SectorNumber, err)
 			}
 
 			err = MoveStorage(ctx, sid, tempDir, sealingResult)
 			if err != nil {
-				log.Errorf("Sector (%d) , running MoveStorage  error: %v", sector, err)
+				log.Errorf("Sector (%d) , running MoveStorage  error: %v", sector.SectorNumber, err)
 			}
 
-			log.Infof("Complete sector (%d)", sector)
+			log.Infof("Complete sector (%d)", sector.SectorNumber)
 		}(sector)
 	}
 	wg.Wait()
