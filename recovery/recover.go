@@ -103,7 +103,7 @@ func migrateRecoverMeta(ctx context.Context, metadata string) (export.RecoveryPa
 
 	rp := export.RecoveryParams{}
 	if err := json.Unmarshal(b, &rp); err != nil {
-		return export.RecoveryParams{}, xerrors.Errorf("unmarshaling sectors recovery metadata: %w", err)
+		return export.RecoveryParams{}, xerrors.Errorf("unmarshalling sectors recovery metadata: %w", err)
 	}
 
 	return rp, nil
@@ -138,21 +138,21 @@ func RecoverSealedFile(ctx context.Context, rp export.RecoveryParams, parallel u
 
 			sdir, err := homedir.Expand(sealingTemp)
 			if err != nil {
-				log.Errorf("Sector (%d) ,expands the path error: %v", sector, err)
+				log.Errorf("Sector (%d) ,expands the path error: %v", sector.SectorNumber, err)
 			}
 			mkdirAll(sdir)
-			tempDir, err := ioutil.TempDir(sdir, fmt.Sprintf("recover-%d", sector))
+			tempDir, err := ioutil.TempDir(sdir, fmt.Sprintf("recover-%d", sector.SectorNumber))
 			if err != nil {
-				log.Errorf("Sector (%d) ,creates a new temporary directory error: %v", sector, err)
+				log.Errorf("Sector (%d) ,creates a new temporary directory error: %v", sector.SectorNumber, err)
 			}
 			if err := os.MkdirAll(tempDir, 0775); err != nil {
-				log.Errorf("Sector (%d) ,creates a directory named path error: %v", sector, err)
+				log.Errorf("Sector (%d) ,creates a directory named path error: %v", sector.SectorNumber, err)
 			}
 			sb, err := ffiwrapper.New(&basicfs.Provider{
 				Root: tempDir,
 			})
 			if err != nil {
-				log.Errorf("Sector (%d) ,new ffi Sealer error: %v", sector, err)
+				log.Errorf("Sector (%d) ,new ffi Sealer error: %v", sector.SectorNumber, err)
 			}
 
 			sid := storage.SectorRef{
