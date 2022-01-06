@@ -18,22 +18,21 @@ import (
 	"golang.org/x/xerrors"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
 var RecoverCmd = &cli.Command{
-	Name:  "recover",
-	Usage: "Recovery sector tools",
+	Name:      "recover",
+	Usage:     "Recovery sector tools",
+	ArgsUsage: "[sectorNum1 sectorNum2 ...]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "sectors-recovery-metadata",
-			Usage: "specify the metadata file for the sectors recovery",
-		},
-		&cli.IntSliceFlag{
-			Name:     "sector",
-			Usage:    "Specify which sectors in the metadata file need to be recovered. Such as: 0",
+			Name:     "sectors-recovery-metadata",
+			Aliases:  []string{"metadata"},
+			Usage:    "specify the metadata file for the sectors recovery (Exported json file)",
 			Required: true,
 		},
 		&cli.UintFlag{
@@ -59,6 +58,19 @@ var RecoverCmd = &cli.Command{
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
+		if cctx.Args().Len() < 1 {
+			return fmt.Errorf("at least one sector must be specified")
+		}
+
+		cmdSectors := make([]uint64, 0)
+		for _, sn := range cctx.Args().Slice() {
+			sectorNum, err := strconv.ParseUint(sn, 10, 64)
+			if err != nil {
+				return fmt.Errorf("could not parse sector number: %w", err)
+			}
+			cmdSectors = append(cmdSectors, sectorNum)
+		}
+
 		pssb := cctx.String("sectors-recovery-metadata")
 		if pssb == "" {
 			return xerrors.Errorf("Undefined sectors recovery metadata")
@@ -71,15 +83,29 @@ var RecoverCmd = &cli.Command{
 			return xerrors.Errorf("migrating sectors metadata: %w", err)
 		}
 
-		runSectors := cctx.IntSlice("sector")
+		skipSectors := make([]uint64, 0)
+		runSectors := make([]uint64, 0)
 		sectorInfos := make(export.SectorInfos, 0)
-		for _, sectorInfo := range rp.SectorInfos {
-			for _, num := range runSectors {
-				if uint64(num) == uint64(sectorInfo.SectorNumber) {
+		for _, sn := range cmdSectors {
+			run := false
+			for _, sectorInfo := range rp.SectorInfos {
+				if sn == uint64(sectorInfo.SectorNumber) {
+					run = true
 					sectorInfos = append(sectorInfos, sectorInfo)
+					runSectors = append(runSectors, sn)
 				}
 			}
+			if !run {
+				skipSectors = append(skipSectors, sn)
+			}
 		}
+		if len(runSectors) > 0 {
+			log.Infof("Sector %v to be recovered, %d in total!", runSectors, len(runSectors))
+		}
+		if len(skipSectors) > 0 {
+			log.Warnf("Skip sector %v, %d in total, because sector information was not found in the metadata file!", skipSectors, len(skipSectors))
+		}
+
 		rp.SectorInfos = sectorInfos
 
 		if err = RecoverSealedFile(ctx, rp, cctx.Uint("parallel"), cctx.String("sealing-result"), cctx.String("sealing-temp")); err != nil {

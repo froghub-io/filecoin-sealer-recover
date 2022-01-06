@@ -19,7 +19,7 @@ func main() {
 		Version: BuildVersion,
 		Commands: []*cli.Command{
 			recovery.RecoverCmd,
-			export.ExportCmd,
+			export.ExportsCmd,
 		},
 	}
 

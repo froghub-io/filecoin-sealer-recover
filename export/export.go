@@ -1,7 +1,6 @@
 package export
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/filecoin-project/go-address"
@@ -14,26 +13,37 @@ import (
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 	"io/ioutil"
+	"strconv"
 	"time"
 )
 
-var ExportCmd = &cli.Command{
-	Name:  "export",
-	Usage: "Export sector metadata",
+var ExportsCmd = &cli.Command{
+	Name:      "export",
+	Usage:     "Export sector metadata",
+	ArgsUsage: "[sectorNum1 sectorNum2 ...]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:     "miner",
 			Usage:    "Filecoin Miner. Such as: f01000",
 			Required: true,
 		},
-		&cli.StringFlag{
-			Name:  "sectors-metadata",
-			Usage: "specify the metadata file for the sectors",
-		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
 		start := time.Now()
+
+		if cctx.Args().Len() < 1 {
+			return fmt.Errorf("at least one sector must be specified")
+		}
+
+		runSectors := make([]uint64, 0)
+		for _, sn := range cctx.Args().Slice() {
+			sectorNum, err := strconv.ParseUint(sn, 10, 64)
+			if err != nil {
+				return fmt.Errorf("could not parse sector number: %w", err)
+			}
+			runSectors = append(runSectors, sectorNum)
+		}
 
 		maddr, err := address.NewFromString(cctx.String("miner"))
 		if err != nil {
@@ -52,32 +62,20 @@ var ExportCmd = &cli.Command{
 			return xerrors.Errorf("Getting StateMinerInfo err:", err)
 		}
 
-		pssb := cctx.String("sectors-metadata")
-		if pssb == "" {
-			return xerrors.Errorf("Undefined sectors metadata")
-		}
-
-		log.Infof("Importing sectors recovery metadata for %s", pssb)
-
-		sectors, err := migrateSectorsMeta(ctx, pssb)
-		if err != nil {
-			return xerrors.Errorf("migrating sectors metadata: %w", err)
-		}
-
 		output := &RecoveryParams{
 			Miner:      maddr,
 			SectorSize: mi.SectorSize,
 		}
 		sectorInfos := make(SectorInfos, 0)
 		failtSectors := make([]uint64, 0)
-		for _, sector := range sectors {
+		for _, sector := range runSectors {
 			ts, sectorPreCommitOnChainInfo, err := GetSectorCommitInfoOnChain(ctx, fullNodeApi, maddr, abi.SectorNumber(sector))
 			if err != nil {
 				log.Errorf("Getting sector (%d) precommit info error: %v ", sector, err)
 				continue
 			}
 			si := &SectorInfo{
-				SectorNumber: sector,
+				SectorNumber: abi.SectorNumber(sector),
 				SealProof:    sectorPreCommitOnChainInfo.Info.SealProof,
 				SealedCID:    sectorPreCommitOnChainInfo.Info.SealedCID,
 			}
@@ -135,25 +133,4 @@ func (t SectorInfos) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
 
 func (t SectorInfos) Less(i, j int) bool {
 	return t[i].SectorNumber < t[j].SectorNumber
-}
-
-type SectorNumbers []abi.SectorNumber
-
-func migrateSectorsMeta(ctx context.Context, metadata string) ([]abi.SectorNumber, error) {
-	metadata, err := homedir.Expand(metadata)
-	if err != nil {
-		return []abi.SectorNumber{}, xerrors.Errorf("expanding sectors recovery dir: %w", err)
-	}
-
-	b, err := ioutil.ReadFile(metadata)
-	if err != nil {
-		return []abi.SectorNumber{}, xerrors.Errorf("reading sectors recovery metadata: %w", err)
-	}
-
-	var sectors []abi.SectorNumber
-	if err := json.Unmarshal(b, &sectors); err != nil {
-		return []abi.SectorNumber{}, xerrors.Errorf("unmarshaling sectors recovery metadata: %w", err)
-	}
-
-	return sectors, nil
 }
