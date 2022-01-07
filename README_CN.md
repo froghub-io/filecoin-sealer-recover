@@ -124,7 +124,7 @@ sealer-recover --version
 ### 使用方式
 1、指定矿工号及扇区列表，导出扇区信息文件：
 ```shell
-export FULLNODE_API_INFO=链节点的token
+export FULLNODE_API_INFO=...:/ip4/10.10.10.1/tcp/1234/http
 sealer-recover export --miner=f01000 1 2 3 4 5 6
 ```
 在当前目录下生成扇区恢复的元数据文件`sectors-recovery-f01000.json`。

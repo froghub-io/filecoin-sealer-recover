@@ -134,7 +134,7 @@ sealer-recover --version
 ### Usage
 1. Specify miner number and sector list, export sector information file:
 ```shell
-export FULLNODE_API_INFO=token of chain node
+export FULLNODE_API_INFO=...:/ip4/10.10.10.1/tcp/1234/http
 sealer-recover export --miner=f01000 1 2 3 4 5 6
 ```
 Generate the sector recovery metadata file `sectors-recovery-f01000.json` in the current directory.
