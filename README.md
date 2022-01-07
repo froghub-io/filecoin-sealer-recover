@@ -99,14 +99,19 @@ See the [Filecoin FFI section](https://docs.filecoin.io/get-started/lotus/instal
 b. Some older Intel and AMD processors without the ADX instruction support may panic with illegal instruction errors. To solve this, add the `CGO_CFLAGS` environment variable:
 
 ```shell
-    export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
-    export CGO_CFLAGS="-D__BLST_PORTABLE__"
+export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
+export CGO_CFLAGS="-D__BLST_PORTABLE__"
 ```
 
-c. By default, a 'multicore-sdr' option is used in the proofs library.  This feature is also used in FFI unless explicitly disabled.  To disable building with the 'multicore-sdr' dependency, set `FFI_USE_MULTICORE_SDR` to `0`:
+c. By default, a `multicore-sdr` option is used in the proofs library.  This feature is also used in FFI unless explicitly disabled.  To disable building with the `multicore-sdr` dependency, set `FFI_USE_MULTICORE_SDR` to `0`:
 
 ```shell
  export FFI_USE_MULTICORE_SDR=0
+```
+
+d.An experimental `gpu` option using CUDA can be used in the proofs library. This feature is disabled by default (opencl is the default, when FFI_USE_GPU=1 is set.). To enable building with the `gpu` CUDA dependency, set FFI_USE_CUDA=1 when building from source.
+```shell
+export FFI_USE_CUDA=1
 ```
 
 3. Build and install
@@ -127,37 +132,49 @@ sealer-recover --version
 ```
 
 ### Usage
-
-help
-
+1. Specify miner number and sector list, export sector information file:
 ```shell
-sealer-recover -h
+export FULLNODE_API_INFO=token of chain node
+sealer-recover export --miner=f01000 1 2 3 4 5 6
 ```
+Generate the sector recovery metadata file `sectors-recovery-f01000.json` in the current directory.
 
-To start.
+**_Note:_ To read the sector information, the lotus daemon needs to have a state tree that is old enough to store it, and the whole chain node is the best.** 
 
+2. Start the recovery program and execute the list of sectors that the machine performs recovery:
 ```shell
 export FIL_PROOFS_USE_MULTICORE_SDR=1
 export FIL_PROOFS_MAXIMIZE_CACHING=1
 export FIL_PROOFS_USE_GPU_COLUMN_BUILDER=1
 export FIL_PROOFS_USE_GPU_TREE_BUILDER=1
 
-export FULLNODE_API_INFO=token of chain node
-sealer-recover --miner=f01000 \
-    --sector=0 \ 
-    --sector=1 \ 
-    --sector=2 \     
+sealer-recover recover \
+    --sectors-recovery-metadata=./sectors-recovery-f01000.json \
     --parallel=6 \ 
     --sealing-result=/sector \ 
-    --sealing-temp=/temp
+    --sealing-temp=/temp \
+    2 4 5
 ```
 
-#### Parameter Description
+#### Tools and Parameter Description
+
+#### Export sector metadata tool:
+```shell
+sealer-recover export [command options] [sectorNum1 sectorNum2 ...]
+```
 
 | Parameters | Meaning | Remarks |
 | :-----| :----- | :----- |
 | miner | The miner number of the sectors to be repaired | Required |
-| sector | Sector number to be repaired | required
+
+#### Sector recovery tool:
+```shell
+sealer-recover recover [command options] [sectorNum1 sectorNum2 ...]
+```
+
+| Parameters | Meaning | Remarks |
+| :-----| :----- | :----- |
+| sectors-recovery-metadata | specify the metadata file for the sectors recovery  | Required |
 | parallel | Number of parallel sectors to be repaired for sector p1, _refer to core count for setting_ | default: 1 |
 | sealing-result | path to the repaired sector product | default: ~/sector |
 | sealing-temp | Intermediate product path for repair process, large space required, NVMe disk recommended | Default: ~/temp <br/> Minimum space: <br/> 32GiB # > 512GiB! <br/> 64GiB # > 1024GiB!
