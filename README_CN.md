@@ -93,10 +93,15 @@ export CGO_CFLAGS_ALLOW="-D__BLST_PORTABLE__"
 export CGO_CFLAGS="-D__BLST_PORTABLE__"
 ```
 
-c.默认情况下，证明库中使用“multicore-sdr”选项。 除非明确禁用，否则此功能也用于 FFI。 要禁用“multicore-sdr”依赖项的构建，请将“FFI_USE_MULTICORE_SDR”设置为“0”：
+c.默认情况下，证明库中使用`multicore-sdr`选项。 除非明确禁用，否则此功能也用于 FFI。 要禁用`multicore-sdr`依赖项的构建，请将`FFI_USE_MULTICORE_SDR`设置为`0`：
 
 ```shell
 export FFI_USE_MULTICORE_SDR=0
+```
+
+d.可以在证明库中使用 CUDA 的实验性`gpu`选项。默认情况下禁用此功能（opencl 是默认值）。要使用`gpu`CUDA 依赖项启用构建，请设置`FFI_USE_CUDA=1`。
+```shell
+export FFI_USE_CUDA=1
 ```
 
 3、Build and install
@@ -117,35 +122,48 @@ sealer-recover --version
 ```
 
 ### 使用方式
-help
-
+1、指定矿工号及扇区列表，导出扇区信息文件：
 ```shell
-sealer-recover -h
+export FULLNODE_API_INFO=链节点的token
+sealer-recover export --miner=f01000 1 2 3 4 5 6
 ```
+在当前目录下生成扇区恢复的元数据文件`sectors-recovery-f01000.json`。
 
-启动：
+**_注意：_ 读取扇区信息，需要lotus daemon有存储足够旧的状态树，全链节点最佳。**
 
+2、启动恢复程序,执行本机执行恢复的扇区列表：
 ```shell
 export FIL_PROOFS_USE_MULTICORE_SDR=1
 export FIL_PROOFS_MAXIMIZE_CACHING=1
 export FIL_PROOFS_USE_GPU_COLUMN_BUILDER=1
 export FIL_PROOFS_USE_GPU_TREE_BUILDER=1
 
-export FULLNODE_API_INFO=链节点的token
-sealer-recover --miner=f01000 \
-    --sector=0 \ 
-    --sector=1 \ 
-    --sector=2 \     
+sealer-recover recover \
+    --sectors-recovery-metadata=./sectors-recovery-f01000.json \
     --parallel=6 \ 
     --sealing-result=/sector \ 
-    --sealing-temp=/temp
+    --sealing-temp=/temp \
+    2 4 5
 ```
 
-### 参数介绍
-| 参数 | 含义 | 备注 |
+### 命令工具和参数介绍
+
+#### 导出扇区元数据工具 ：
+```shell
+sealer-recover export [command options] [sectorNum1 sectorNum2 ...]
+```
+
+| 命令参数 | 含义 | 备注 |
 | :-----| :----- | :----- |
 | miner | 需要修复扇区的矿工号  | 必填 |
-| sector | 需要修复的扇区号 | 必填 |
+
+#### 扇区恢复工具:
+```shell
+sealer-recover recover [command options] [sectorNum1 sectorNum2 ...]
+```
+| 命令参数 | 含义 | 备注 |
+| :-----| :----- | :----- |
+| sectors-recovery-metadata | 指定扇区恢复的元数据文件  | 必填 |
 | parallel | 修复扇区p1的并行数, _参考核心数进行设置_ | 默认值：1 |
 | sealing-result | 修复后的扇区产物路径 | 默认值: ~/sector |
 | sealing-temp | 修复过程的中间产物路径，需要大空间，建议使用NVMe盘 | 默认值: ~/temp <br/> 最小空间: <br/> 32GiB # > 512GiB! <br/> 64GiB  # > 1024GiB! |
