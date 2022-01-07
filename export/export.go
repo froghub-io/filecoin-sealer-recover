@@ -8,14 +8,16 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
 	"github.com/ipfs/go-cid"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/mitchellh/go-homedir"
-	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 	"io/ioutil"
 	"strconv"
 	"time"
 )
+
+var log = logging.Logger("export")
 
 var ExportsCmd = &cli.Command{
 	Name:      "export",
