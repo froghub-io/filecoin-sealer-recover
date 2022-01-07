@@ -139,7 +139,7 @@ sealer-recover export --miner=f01000 1 2 3 4 5 6
 ```
 Generate the sector recovery metadata file `sectors-recovery-f01000.json` in the current directory.
 
-**_Note:_ To read the sector information, the lotus daemon needs to have a state tree that is old enough to store it, and the whole chain node is the best.** 
+**_Note:_ To read the sector information, the lotus daemon needs to have a state tree that is old enough to store it, and the full node is the best.** 
 
 2. Start the recovery program and execute the list of sectors that the machine performs recovery:
 ```shell
