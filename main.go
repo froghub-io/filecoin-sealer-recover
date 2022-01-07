@@ -30,4 +30,4 @@ func main() {
 }
 
 // BuildVersion is the local build version
-const BuildVersion = "1.0.0"
+const BuildVersion = "1.1.0"
