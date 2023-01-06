@@ -23,22 +23,22 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	cliutil "github.com/filecoin-project/lotus/cli/util"
-	"github.com/filecoin-project/lotus/extern/sector-storage/ffiwrapper"
-	"github.com/filecoin-project/lotus/extern/sector-storage/ffiwrapper/basicfs"
-	sealing "github.com/filecoin-project/lotus/extern/storage-sealing"
-	"github.com/filecoin-project/specs-storage/storage"
+	nr "github.com/filecoin-project/lotus/storage/pipeline/lib/nullreader"
+	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
+	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper/basicfs"
+	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 	"github.com/froghub-io/filecoin-sealer-recover/export"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/mitchellh/go-homedir"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/xerrors"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"math/rand"
 )
 
 var log = logging.Logger("recover")
@@ -201,7 +201,7 @@ func RecoverSealedFile(ctx context.Context, rp export.RecoveryParams, parallel u
 				log.Errorf("Sector (%d) ,new ffi Sealer error: %v", sector.SectorNumber, err)
 			}
 
-			sid := storage.SectorRef{
+			sid := storiface.SectorRef{
 				ID: abi.SectorID{
 					Miner:  abi.ActorID(actorID),
 					Number: sector.SectorNumber,
@@ -212,7 +212,7 @@ func RecoverSealedFile(ctx context.Context, rp export.RecoveryParams, parallel u
 			log.Infof("Start recover sector(%d,%d), registeredSealProof: %d, ticket: %x", actorID, sector.SectorNumber, sector.SealProof, sector.Ticket)
 
 			log.Infof("Start running AP, sector (%d)", sector.SectorNumber)
-			pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(rp.SectorSize).Unpadded(), sealing.NewNullReader(abi.UnpaddedPieceSize(rp.SectorSize)))
+			pi, err := sb.AddPiece(context.TODO(), sid, nil, abi.PaddedPieceSize(rp.SectorSize).Unpadded(), nr.NewNullReader(abi.UnpaddedPieceSize(rp.SectorSize)))
 			if err != nil {
 				log.Errorf("Sector (%d) ,running AP  error: %v", sector.SectorNumber, err)
 			}
@@ -247,7 +247,7 @@ func RecoverSealedFile(ctx context.Context, rp export.RecoveryParams, parallel u
 
 var pc2Lock sync.Mutex
 
-func sealPreCommit2AndCheck(ctx context.Context, sb *ffiwrapper.Sealer, sid storage.SectorRef, phase1Out storage.PreCommit1Out, sealedCID string) error {
+func sealPreCommit2AndCheck(ctx context.Context, sb *ffiwrapper.Sealer, sid storiface.SectorRef, phase1Out storiface.PreCommit1Out, sealedCID string) error {
 	pc2Lock.Lock()
 	log.Infof("Start running PreCommit2, sector (%d)", sid.ID)
 
@@ -266,7 +266,7 @@ func sealPreCommit2AndCheck(ctx context.Context, sb *ffiwrapper.Sealer, sid stor
 	return nil
 }
 
-func MoveStorage(ctx context.Context, sector storage.SectorRef, tempDir string, sealingResult string) error {
+func MoveStorage(ctx context.Context, sector storiface.SectorRef, tempDir string, sealingResult string) error {
 	//del unseal
 	if err := os.RemoveAll(tempDir + "/unsealed"); err != nil {
 		return xerrors.Errorf("SectorID: %d, del unseal error：%s", sector.ID, err)
