@@ -196,6 +196,17 @@ PRs, bug reports and issue suggestions are welcome! For major changes, please as
 - [FILFrog](https://www.froghub.io/)
 - [Lotus CloudC2](https://github.com/froghub-io/lotus-cloudc2)
 
+### Contact us
+
+- [Slack](https://froghub.slack.com/) @Plus-FrogHub
+
+- Email：  froghub@163.com
+
+- [Wechat](https://www.wechat.com/en/)
+
+<img src="https://storageapi.fleek.co/froghubman-team-bucket/5df07fba-972f-4c66-9089-00c4bd007768.png" width="100" />
+
+
 ## License
 
 Licensed under [Apache 2.0](https://github.com/froghub-io/filecoin-sealer-recover/blob/main/LICENSE)
